@@ -10,15 +10,27 @@ public sealed class DiagnosticsController : ControllerBase
     [HttpGet("ping")]
     public IActionResult Ping([FromQuery] string host)
     {
-        using var process = new Process();
-        process.StartInfo.FileName = "sh";
-        process.StartInfo.Arguments = "-c \"ping -c 1 " + host + "\"";
-        process.StartInfo.RedirectStandardOutput = true;
-        process.StartInfo.RedirectStandardError = true;
-        process.StartInfo.UseShellExecute = false;
-        process.Start();
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit();
+        if (string.IsNullOrWhiteSpace(host) ||
+            (!System.Net.IPAddress.TryParse(host, out _) && Uri.CheckHostName(host) != UriHostNameType.Dns))
+        {
+            return BadRequest("Invalid host target");
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "ping",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("1");
+        startInfo.ArgumentList.Add(host);
+
+        using var process = Process.Start(startInfo);
+        var output = process?.StandardOutput.ReadToEnd() ?? string.Empty;
+        process?.WaitForExit();
 
         return Ok(new { output });
     }
